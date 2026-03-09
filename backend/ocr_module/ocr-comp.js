@@ -2,11 +2,13 @@ import express from 'express';
 import multer from 'multer';
 import { createWorker } from 'tesseract.js';
 import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
 
 const app = express();
 const port = 3000;
+dotenv.config();
 
-const ai = new GoogleGenAI({ apiKey: "AIzaSyCftJgB8sDeqtw326YOgQ11zzTeRU3CBVo" });
+const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 const model = "gemini-2.5-flash";
 
 const upload = multer({ storage: multer.memoryStorage() });
