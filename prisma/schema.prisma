@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  customApiKey  String?
+  createdAt     DateTime  @default(now())
+  accounts      Account[]
+  forms         Form[]
+  sessions      Session[]
+}
+
+model Form {
+  id              String    @id @default(cuid())
+  title           String
+  description     String?
+  userId          String
+  isPublished     Boolean   @default(false)
+  isAnonymous     Boolean   @default(false)
+  allowMultiple   Boolean   @default(false)
+  expiresAt       DateTime?
+  deletedAt       DateTime?
+  theme           Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  emailCollection EmailCollection @default(NONE)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions       Question[]
+  responses       Response[]
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  formId      String
+  type        String
+  label       String
+  placeholder String?
+  required    Boolean  @default(false)
+  options     Json?
+  order       Int
+  aiGenerated Boolean  @default(false)
+  answers     Answer[]
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+}
+
+model Response {
+  id             String   @id @default(cuid())
+  formId         String
+  submittedAt    DateTime @default(now())
+  ipHash         String?
+  integrityScore Float?
+  sentimentScore Float?
+  isSpam         Boolean  @default(false)
+  isFlagged      Boolean  @default(false)
+  metadata       Json?
+  answers        Answer[]
+  form           Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+}
+
+enum EmailCollection {
+  NONE
+  VERIFIED
+  INPUT
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  responseId String
+  questionId String
+  value      String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+}
+
+
