@@ -1,1 +1,0 @@
-"use strict";exports.id=8079,exports.ids=[8079],exports.modules={8079:(e,r,d)=>{d.r(r),d.d(r,{Sidebar:()=>s});let s=(0,d(68570).createProxy)(String.raw`D:\Feed-mind-2\frontend\components\shared\sidebar.tsx#Sidebar`)}};
