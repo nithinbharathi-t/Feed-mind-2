@@ -16,6 +16,11 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Keep old databases compatible when password auth is introduced.
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT'
+    );
+
     const body = (await req.json()) as {
       name?: string;
       email?: string;
@@ -72,6 +77,20 @@ export async function POST(req: Request) {
             "Database is not configured. Set DATABASE_URL and DIRECT_URL in frontend/.env.local and restart the app.",
         },
         { status: 503 }
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.toLowerCase().includes("permission") &&
+      error.message.toLowerCase().includes("alter table")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Database schema is outdated and cannot be auto-updated with current permissions. Run Prisma migration/db push once with a privileged DB user.",
+        },
+        { status: 500 }
       );
     }
 

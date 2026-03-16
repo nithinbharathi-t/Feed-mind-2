@@ -37,10 +37,27 @@ export default function RegisterPage() {
         body: JSON.stringify({ name, email, password }),
       });
 
-      const json = (await res.json()) as { error?: string };
+      let errorMessage = "Failed to create account.";
 
       if (!res.ok) {
-        setError(json.error ?? "Failed to create account.");
+        const responseText = await res.text();
+
+        try {
+          const parsed = JSON.parse(responseText) as { error?: string };
+          if (parsed.error) {
+            errorMessage = parsed.error;
+          }
+        } catch {
+          // Some wrong-origin responses return plain text (e.g. NextAuth action errors).
+          if (responseText.includes("This action with HTTP POST is not supported by NextAuth.js")) {
+            errorMessage =
+              "Registration endpoint was not reached. Open the app on the same port where /auth/register is served (typically http://localhost:3002).";
+          } else if (responseText.trim()) {
+            errorMessage = responseText.trim();
+          }
+        }
+
+        setError(errorMessage);
         return;
       }
 
