@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { extractTextFromUploadedFile } from "@/lib/document-extraction";
+import { saveDocumentContext } from "@/lib/document-context";
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,6 +66,20 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
+    const extraction = await extractTextFromUploadedFile({
+      name: filename,
+      type: file.type || "",
+      buffer,
+    });
+
+    const uploader = session.user?.email || "anonymous";
+    const savedContext = await saveDocumentContext({
+      uploader,
+      filename,
+      mimeType: file.type || fileExtension,
+      content: extraction.extractedText,
+    });
+
     return NextResponse.json({
       success: true,
       message: "File uploaded successfully",
@@ -71,7 +87,12 @@ export async function POST(request: NextRequest) {
       originalName: filename,
       size: file.size,
       type: fileExtension,
-      uploadedAt: new Date().toISOString()
+      uploadedAt: new Date().toISOString(),
+      extraction: {
+        method: extraction.method,
+        extractedTextLength: extraction.extractedText.length,
+        contextStored: Boolean(savedContext),
+      },
     });
 
   } catch (error: any) {

@@ -41,14 +41,6 @@ export default async function DashboardLayout({
     },
   });
 
-  // Unresolved integrity alerts (spam + flagged)
-  const integrityAlerts = await prisma.response.count({
-    where: {
-      form: { userId: user.id },
-      OR: [{ isSpam: true }, { isFlagged: true }],
-    },
-  });
-
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar
@@ -59,7 +51,6 @@ export default async function DashboardLayout({
         }}
         responsesThisMonth={responsesThisMonth}
         responsesLimit={100}
-        integrityAlerts={integrityAlerts}
       />
       <main className="flex-1 ml-64 min-h-screen px-9 py-6">{children}</main>
     </div>

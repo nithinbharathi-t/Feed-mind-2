@@ -51,6 +51,10 @@ export function CreateFormDialog() {
 
   const handleSelect = (mode: string) => {
     setOpen(false);
+    if (mode === "ai") {
+      router.push("/forms/new/ai");
+      return;
+    }
     router.push(`/forms/new?mode=${mode}`);
   };
 

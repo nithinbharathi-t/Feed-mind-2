@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { decrypt } from "@/lib/utils";
+import { decodeUserSecrets } from "@/lib/user-secrets";
 import {
   generateFormFromPrompt,
   suggestQuestions,
@@ -17,21 +17,19 @@ async function getUserApiKey(): Promise<string | null> {
   if (!session?.user?.email) return null;
   const user = await prisma.user.findUnique({ where: { email: session.user.email } });
   if (!user?.customApiKey) return null;
-  try {
-    return decrypt(user.customApiKey);
-  } catch {
-    return null;
-  }
+  return decodeUserSecrets(user.customApiKey).groqApiKey ?? null;
 }
 
 export async function generateForm(prompt: string) {
+  const session = await getServerSession(authOptions);
   const apiKey = await getUserApiKey();
-  return generateFormFromPrompt(prompt, apiKey);
+  return generateFormFromPrompt(prompt, apiKey, session?.user?.email ?? undefined);
 }
 
 export async function getQuestionSuggestions(existingQuestions: string[], context: string) {
+  const session = await getServerSession(authOptions);
   const apiKey = await getUserApiKey();
-  return suggestQuestions(existingQuestions, context, apiKey);
+  return suggestQuestions(existingQuestions, context, apiKey, session?.user?.email ?? undefined);
 }
 
 export async function analyzeFormResponses(formId: string) {
@@ -58,8 +56,8 @@ export async function analyzeFormResponses(formId: string) {
     })),
   }));
 
-  const apiKey = user.customApiKey ? decrypt(user.customApiKey) : null;
-  return analyzeResponses(form.title, responseData, apiKey);
+  const apiKey = decodeUserSecrets(user.customApiKey).groqApiKey ?? null;
+  return analyzeResponses(form.title, responseData, apiKey, user.email ?? undefined);
 }
 
 export async function scoreIntegrity(responseId: string) {
@@ -72,9 +70,7 @@ export async function scoreIntegrity(responseId: string) {
   const questions = response.answers.map((a: any) => a.question.label);
   const answers = response.answers.map((a: any) => a.value);
 
-  const apiKey = response.form.user.customApiKey
-    ? decrypt(response.form.user.customApiKey)
-    : null;
+  const apiKey = decodeUserSecrets(response.form.user.customApiKey).groqApiKey ?? null;
 
   const score = await scoreResponseIntegrity(questions, answers, apiKey);
 
@@ -103,9 +99,7 @@ export async function runSentimentAnalysis(responseId: string) {
 
   if (textAnswers.length === 0) return null;
 
-  const apiKey = response.form.user.customApiKey
-    ? decrypt(response.form.user.customApiKey)
-    : null;
+  const apiKey = decodeUserSecrets(response.form.user.customApiKey).groqApiKey ?? null;
 
   const sentiment = await analyzeSentiment(textAnswers, apiKey);
   const sentimentScore = sentiment === "positive" ? 1 : sentiment === "negative" ? -1 : 0;
@@ -209,6 +203,36 @@ export async function generateQuestionsFromTrainedModel(
   const nlpUrl =
     (process.env.NLP_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
+  // If Vertex/Qwen is configured as the active provider, generate directly
+  // from the LLM so question generation follows the same provider as insights.
+  if ((process.env.AI_PROVIDER || "").toLowerCase() === "vertex") {
+    try {
+      const session = await getServerSession(authOptions);
+      const apiKey = await getUserApiKey();
+      const generated = await generateFormFromPrompt(
+        prompt,
+        apiKey,
+        useUploadedData ? session?.user?.email ?? undefined : undefined
+      );
+
+      return {
+        questions: (generated.questions || []).slice(0, numQuestions).map((q: any, i: number) => ({
+          id: `vertex-${i}`,
+          text: q.label || q.text || `Question ${i + 1}`,
+          type: q.type || "text",
+          placeholder: q.placeholder,
+          required: q.required ?? false,
+          options: q.options,
+        })),
+        generated_from_context: useUploadedData,
+        num_documents_used: useUploadedData ? 1 : 0,
+        message: "Generated using Vertex Qwen",
+      };
+    } catch (err) {
+      console.error("Vertex question generation failed, falling back to NLP API:", err);
+    }
+  }
+
   try {
     const res = await fetch(`${nlpUrl}/api/v1/questions/generate`, {
       method: "POST",
@@ -265,8 +289,16 @@ export async function generateQuestionsFromTrainedModel(
  * Fallback question generation when trained model is unavailable
  */
 function generateFallbackQuestions(prompt: string, count: number) {
+  type FallbackQuestion = {
+    type: string;
+    label: string;
+    placeholder?: string;
+    required: boolean;
+    options?: string[];
+  };
+
   const promptLower = prompt.toLowerCase();
-  let questions = [];
+  let questions: FallbackQuestion[] = [];
 
   // Context-aware fallback questions
   if (promptLower.includes("customer") || promptLower.includes("service")) {

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AiPromptPanel } from "@/components/forms/ai-prompt-panel";
 import { FormBuilder } from "@/components/forms/form-builder";
+import { FormSettingsSidebar } from "@/components/forms/form-settings-sidebar";
 import { useFormBuilder } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -303,14 +304,11 @@ export function EditFormClient({ formId, initialData }: EditFormClientProps) {
         <FormBuilder formId={formId} hideControls />
       </div>
 
-      {/* ═══════════════════════════════ FIXED AI PANEL (right, full-height like sidebar) ═══════════════════════════ */}
-      <aside className="fixed right-0 top-0 h-screen w-80 flex flex-col bg-background border-l border-border/50 z-30 overflow-hidden">
-        <AiPromptPanel
-          onAcceptAll={handleAcceptAll}
-          onAcceptQuestion={handleAcceptQuestion}
-          activeQuestionIds={questions.map((q) => q.id)}
-        />
-      </aside>
+      {/* ═════════════════════════════════════ FORM SETTINGS SIDEBAR (right, full-height) ═══════════════════════════ */}
+      <FormSettingsSidebar onSettingsChange={(settings) => {
+        // Handle settings changes
+        console.log('Form settings updated:', settings);
+      }} />
 
       {/* ═════════════════════════════════════ LEAVE DIALOG ══════════════════════════════════════════ */}
       <Dialog open={showBackDialog} onOpenChange={setShowBackDialog}>
