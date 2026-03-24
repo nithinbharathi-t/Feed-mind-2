@@ -1,11 +1,23 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { formSchema, questionSchema } from "@/lib/validations";
 import { z } from "zod";
+
+export type FormByIdResult = Prisma.FormGetPayload<{
+  include: {
+    questions: { orderBy: { order: "asc" } };
+    responses: {
+      include: { answers: true };
+      orderBy: { submittedAt: "desc" };
+    };
+    _count: { select: { responses: true } };
+  };
+}>;
 
 async function getCurrentUser() {
   const session = await getServerSession(authOptions);
@@ -141,7 +153,7 @@ export async function getUserForms() {
   });
 }
 
-export async function getFormById(formId: string) {
+export async function getFormById(formId: string): Promise<FormByIdResult | null> {
   const user = await getCurrentUser();
 
   return prisma.form.findFirst({

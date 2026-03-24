@@ -12,7 +12,7 @@ export default async function EditFormPage({ params }: { params: { formId: strin
       initialData={{
         title: form.title,
         description: form.description || "",
-        questions: form.questions.map((q) => ({
+        questions: form.questions.map((q: (typeof form.questions)[number]) => ({
           id: q.id,
           type: q.type,
           label: q.label,

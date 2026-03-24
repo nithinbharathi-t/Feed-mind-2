@@ -11,18 +11,37 @@ import Link from "next/link";
 import { MessageSquare, TrendingUp, Clock, Target, Eye, Edit } from "lucide-react";
 import { format, subDays, startOfDay } from "date-fns";
 
+type FormQuestion = {
+  id: string;
+  label: string;
+  type: string;
+};
+
+type FormAnswer = {
+  questionId: string;
+  value: string;
+};
+
+type FormResponse = {
+  isSpam: boolean;
+  isFlagged: boolean;
+  submittedAt: Date;
+  answers: FormAnswer[];
+};
+
 export default async function AnalyticsPage({ params }: { params: { formId: string } }) {
   const form = await getFormById(params.formId);
   if (!form) redirect("/dashboard");
 
-  const responses = form.responses;
+  const responses = form.responses as FormResponse[];
+  const questions = form.questions as FormQuestion[];
   const totalResponses = responses.length;
   const spamCount = responses.filter((r) => r.isSpam).length;
   const flaggedCount = responses.filter((r) => r.isFlagged && !r.isSpam).length;
   const cleanCount = totalResponses - spamCount - flaggedCount;
 
   // NPS calculation
-  const npsQuestion = form.questions.find((q) => q.type === "NPS");
+  const npsQuestion = questions.find((q) => q.type === "NPS");
   let npsScore: number | null = null;
   if (npsQuestion) {
     const npsAnswers = responses
@@ -49,7 +68,7 @@ export default async function AnalyticsPage({ params }: { params: { formId: stri
   }
 
   // Per-question answers
-  const questionAnswers = form.questions.map((q) => ({
+  const questionAnswers = questions.map((q) => ({
     question: { id: q.id, label: q.label, type: q.type },
     answers: responses
       .flatMap((r) => r.answers)
@@ -75,7 +94,7 @@ export default async function AnalyticsPage({ params }: { params: { formId: stri
           value={totalResponses > 0 ? "100%" : "0%"}
           icon={TrendingUp}
         />
-        <StatsCard title="Avg. Questions" value={form.questions.length} icon={Clock} />
+        <StatsCard title="Avg. Questions" value={questions.length} icon={Clock} />
         {npsScore !== null && (
           <StatsCard title="NPS Score" value={npsScore} icon={Target} />
         )}

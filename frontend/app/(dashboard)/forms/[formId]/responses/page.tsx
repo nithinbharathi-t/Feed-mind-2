@@ -28,14 +28,14 @@ export default async function ResponsesPage({ params }: { params: { formId: stri
       <ResponsesClient
         formId={params.formId}
         questions={form.questions}
-        responses={responses.map((r) => ({
+        responses={responses.map((r: (typeof responses)[number]) => ({
           id: r.id,
           submittedAt: r.submittedAt.toISOString(),
           integrityScore: r.integrityScore,
           sentimentScore: r.sentimentScore,
           isSpam: r.isSpam,
           isFlagged: r.isFlagged,
-          answers: r.answers.map((a) => ({
+          answers: r.answers.map((a: (typeof r.answers)[number]) => ({
             questionId: a.questionId,
             questionLabel: a.question.label,
             value: a.value,
