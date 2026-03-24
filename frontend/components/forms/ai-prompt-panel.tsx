@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Check, Loader2, Send } from "lucide-react";
-import { generateForm, generateQuestionsFromTrainedModel } from "@/server/actions/ai";
 
 interface GeneratedQuestion {
   type: string;
@@ -19,6 +18,8 @@ interface AiPromptPanelProps {
   activeQuestionIds: string[];
 }
 
+type AIProvider = "gemini" | "grok" | "claude";
+
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
 function AcceptedCheck() {
@@ -29,6 +30,7 @@ function AcceptedCheck() {
 
 function AiGenerateTab({ onAcceptAll, onAcceptQuestion, activeQuestionIds }: AiPromptPanelProps) {
   const [prompt, setPrompt] = useState("");
+  const [provider, setProvider] = useState<AIProvider>("gemini");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generated, setGenerated] = useState<{
     title: string;
@@ -54,43 +56,34 @@ function AiGenerateTab({ onAcceptAll, onAcceptQuestion, activeQuestionIds }: AiP
     setIsGenerating(true);
     setError("");
     try {
-      // Try using trained model first (BERT + BART context-aware)
-      const trainedResult = await generateQuestionsFromTrainedModel(prompt.trim(), 5);
-      
-      if (trainedResult && trainedResult.questions.length > 0) {
-        // Convert questions to consistent format (text -> label for compatibility)
-        const normalizedQuestions = trainedResult.questions.map((q: any) => ({
-          ...q,
-          label: q.label || q.text, // Ensure label exists
-          type: q.type || 'text'
-        }));
-        
-        // Use trained model results
-        setGenerated({
-          title: prompt.trim(),
-          description: trainedResult.generated_from_context
-            ? `Generated from ${trainedResult.num_documents_used} uploaded documents using BERT context analysis`
-            : "Generated using AI templates",
-          questions: normalizedQuestions
-        });
-      } else {
-        // Fallback to original API
-        const result = await generateForm(prompt);
-        setGenerated(result);
+      const response = await fetch("/api/ai/generate-questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          topic: prompt.trim(),
+          count: 5,
+          provider,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to generate questions");
       }
-      
+
+      const result = await response.json();
+      setGenerated({
+        title: result.title || prompt.trim(),
+        description: result.description || `Generated with ${provider.toUpperCase()}`,
+        questions: result.questions || [],
+      });
+
       setAcceptedMap(new Map());
       setPrompt("");
     } catch (err: any) {
-      // If trained model fails, try original API as fallback
-      try {
-        const result = await generateForm(prompt);
-        setGenerated(result);
-        setAcceptedMap(new Map());
-        setPrompt("");
-      } catch (fallbackErr: any) {
-        setError(fallbackErr.message || "Failed to generate");
-      }
+      setError(err.message || "Failed to generate");
     } finally {
       setIsGenerating(false);
     }
@@ -148,6 +141,20 @@ function AiGenerateTab({ onAcceptAll, onAcceptQuestion, activeQuestionIds }: AiP
       {error && <p className="text-xs text-red-500 shrink-0">{error}</p>}
 
       <div className="mt-auto shrink-0 space-y-3">
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wide">Provider</p>
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as AIProvider)}
+            disabled={isGenerating}
+            className="h-9 w-full rounded-lg border border-border bg-background px-2 text-xs"
+          >
+            <option value="gemini">Gemini</option>
+            <option value="grok">Grok</option>
+            <option value="claude">Claude</option>
+          </select>
+        </div>
+
         {/* Quick Prompts Section */}
         <div className="space-y-2">
           <p className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wide">Quick Prompts</p>
@@ -197,7 +204,7 @@ export function AiPromptPanel({ onAcceptAll, onAcceptQuestion, activeQuestionIds
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20">
           <Sparkles className="h-4 w-4 text-primary" />
         </div>
-        <span className="font-semibold text-sm">AI Suggestion</span>
+        <span className="font-semibold text-[18px]">AI Suggestion</span>
       </div>
 
       {/* Tab content */}

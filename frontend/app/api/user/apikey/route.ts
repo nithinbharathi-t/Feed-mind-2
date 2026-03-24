@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { encrypt } from "@/lib/utils";
+import { decodeUserSecrets, encodeUserSecrets } from "@/lib/user-secrets";
 
 export async function PUT(req: NextRequest) {
   try {
@@ -13,7 +13,16 @@ export async function PUT(req: NextRequest) {
 
     const { apiKey } = await req.json();
 
-    const encrypted = apiKey ? encrypt(apiKey) : null;
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { customApiKey: true },
+    });
+
+    const currentSecrets = decodeUserSecrets(user?.customApiKey);
+    const encrypted = encodeUserSecrets({
+      ...currentSecrets,
+      groqApiKey: typeof apiKey === "string" ? apiKey : undefined,
+    });
 
     await prisma.user.update({
       where: { email: session.user.email },

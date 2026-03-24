@@ -2,12 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashIP } from "@/lib/utils";
 import { headers } from "next/headers";
+import { decodeUserSecrets } from "@/lib/user-secrets";
+
+async function sendSlackNotification(webhookUrl: string, payload: Record<string, unknown>) {
+  await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+}
 
 export async function POST(req: NextRequest, { params }: { params: { formId: string } }) {
   try {
     const form = await prisma.form.findUnique({
       where: { id: params.formId },
-      include: { questions: true },
+      include: { questions: true, user: { select: { customApiKey: true } } },
     });
 
     if (!form) return NextResponse.json({ error: "Form not found" }, { status: 404 });
@@ -62,6 +72,53 @@ export async function POST(req: NextRequest, { params }: { params: { formId: str
       },
       include: { answers: true },
     });
+
+    const secrets = decodeUserSecrets(form.user.customApiKey);
+    if (secrets.slackWebhookUrl) {
+      const answerPreview = (answers || [])
+        .slice(0, 3)
+        .map((a: any) => {
+          const question = form.questions.find((q) => q.id === a.questionId);
+          return `• ${question?.label ?? "Question"}: ${String(a.value ?? "").slice(0, 120)}`;
+        })
+        .join("\n");
+
+      const slackPayload = {
+        text: `New response received for ${form.title}`,
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: `New response: ${form.title}`,
+              emoji: true,
+            },
+          },
+          {
+            type: "section",
+            fields: [
+              { type: "mrkdwn", text: `*Form ID*\n${form.id}` },
+              { type: "mrkdwn", text: `*Submitted At*\n${new Date().toLocaleString()}` },
+              { type: "mrkdwn", text: `*Spam Flag*\n${isSpam ? "Yes" : "No"}` },
+              { type: "mrkdwn", text: `*Answer Count*\n${(answers || []).length}` },
+            ],
+          },
+          ...(answerPreview
+            ? [
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: `*Answer Preview*\n${answerPreview}`,
+                  },
+                },
+              ]
+            : []),
+        ],
+      };
+
+      sendSlackNotification(secrets.slackWebhookUrl, slackPayload).catch(() => null);
+    }
 
     // Async integrity/sentiment scoring will be triggered separately
     return NextResponse.json({ success: true, responseId: response.id }, { status: 201 });

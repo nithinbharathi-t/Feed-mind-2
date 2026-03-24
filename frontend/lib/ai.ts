@@ -1,5 +1,7 @@
 import Groq from "groq-sdk";
 import { analyzeFeedback, analyzeFeedbackBatch, type NlpBatchItem } from "./nlp-client";
+import { generateVertexQwenText } from "./vertex-qwen";
+import { getRecentContextText } from "./document-context";
 
 const MODEL = "llama-3.3-70b-versatile";
 
@@ -9,12 +11,54 @@ export function getGroqClient(userApiKey?: string | null) {
   return new Groq({ apiKey: key });
 }
 
-async function generateText(prompt: string, userApiKey?: string | null, temperature = 0.7): Promise<string> {
+async function generateText(
+  prompt: string,
+  userApiKey?: string | null,
+  temperature = 0.7,
+  options?: {
+    uploader?: string;
+    includeContext?: boolean;
+  }
+): Promise<string> {
+  const provider = (process.env.AI_PROVIDER || "groq").toLowerCase();
+  const includeContext = options?.includeContext ?? true;
+
+  let contextBlock = "";
+  if (includeContext) {
+    const context = await getRecentContextText({
+      uploader: options?.uploader,
+      limit: 5,
+      maxChars: 8_000,
+    });
+    if (context) {
+      contextBlock = `\n\nUse this uploaded context to ground your answer:\n${context}\n\nIf context is relevant, prioritize it.`;
+    }
+  }
+
+  const finalPrompt = `${prompt}${contextBlock}`;
+
+  if (provider === "vertex") {
+    return generateVertexQwenText(
+      [
+        {
+          role: "system",
+          content:
+            "You are FeedMind's survey intelligence assistant. Generate concise, valid outputs exactly in the requested format.",
+        },
+        { role: "user", content: finalPrompt },
+      ],
+      {
+        temperature,
+        maxTokens: 2048,
+      }
+    );
+  }
+
   const key = (userApiKey || process.env.GROQ_API_KEY || "").trim();
   if (!key) throw new Error("No Groq API key configured. Add GROQ_API_KEY to .env.local or set one in your profile.");
   const groq = new Groq({ apiKey: key });
   const completion = await groq.chat.completions.create({
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content: finalPrompt }],
     model: MODEL,
     temperature,
   });
@@ -28,7 +72,8 @@ function extractJson(text: string): string {
 
 export async function generateFormFromPrompt(
   prompt: string,
-  userApiKey?: string | null
+  userApiKey?: string | null,
+  uploader?: string
 ) {
   const text = await generateText(
     `You are a form builder AI. Based on the following description, generate a feedback form.
@@ -51,7 +96,8 @@ User's description: ${prompt}
 
 Return ONLY valid JSON, no markdown, no explanation.`,
     userApiKey,
-    0.7
+    0.7,
+    { uploader }
   );
   return JSON.parse(extractJson(text));
 }
@@ -59,7 +105,8 @@ Return ONLY valid JSON, no markdown, no explanation.`,
 export async function suggestQuestions(
   existingQuestions: string[],
   context: string,
-  userApiKey?: string | null
+  userApiKey?: string | null,
+  uploader?: string
 ) {
   const text = await generateText(
     `You are a form builder AI. Given these existing questions for a form about "${context}":
@@ -78,7 +125,8 @@ Suggest 3 additional questions that would improve this form. Return a JSON array
 
 Return ONLY valid JSON.`,
     userApiKey,
-    0.7
+    0.7,
+    { uploader }
   );
   return JSON.parse(extractJson(text));
 }
@@ -86,7 +134,8 @@ Return ONLY valid JSON.`,
 export async function analyzeResponses(
   formTitle: string,
   responses: object[],
-  userApiKey?: string | null
+  userApiKey?: string | null,
+  uploader?: string
 ) {
   // ── Extract all text answers from all responses ────────────────────────────
   type AnswerRow = { question: string; answer: string };
@@ -142,7 +191,8 @@ Return a JSON object:
 
 Return ONLY valid JSON, no markdown.`,
     userApiKey,
-    0.3
+    0.3,
+    { uploader }
   );
   return JSON.parse(extractJson(text));
 }

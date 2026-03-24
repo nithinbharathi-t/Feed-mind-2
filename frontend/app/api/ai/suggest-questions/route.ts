@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { suggestQuestions } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
-import { decrypt } from "@/lib/utils";
+import { decodeUserSecrets } from "@/lib/user-secrets";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const { existingQuestions, context } = await req.json();
 
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    const apiKey = user?.customApiKey ? decrypt(user.customApiKey) : null;
+    const apiKey = decodeUserSecrets(user?.customApiKey).groqApiKey ?? null;
 
     const result = await suggestQuestions(existingQuestions, context, apiKey);
     return NextResponse.json(result);

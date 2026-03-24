@@ -43,17 +43,19 @@ model VerificationToken {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  passwordHash  String?
-  emailVerified DateTime?
-  image         String?
-  customApiKey  String?
-  createdAt     DateTime  @default(now())
-  accounts      Account[]
-  forms         Form[]
-  sessions      Session[]
+  id               String    @id @default(cuid())
+  name             String?
+  email            String    @unique
+  passwordHash     String?
+  emailVerified    DateTime?
+  image            String?
+  customApiKey     String?
+  aiProvider       String    @default("gemini")
+  aiProviderEnabled Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  accounts         Account[]
+  forms            Form[]
+  sessions         Session[]
 }
 
 model Form {

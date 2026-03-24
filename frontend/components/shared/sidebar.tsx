@@ -11,16 +11,13 @@ import {
   LayoutGrid,
   MessageSquare,
   BarChart2,
-  ShieldAlert,
-  Plug,
-  Users,
-  Layers,
   Settings,
   Zap,
   ChevronDown,
   Settings2,
   LogOut,
   Database,
+  FileImage,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -48,14 +45,8 @@ const mainNav: NavItem[] = [
   { label: "My Forms", href: "/forms", icon: LayoutGrid },
   { label: "Responses", href: "/responses", icon: MessageSquare },
   { label: "Analytics", href: "/analytics", icon: BarChart2, badge: "Beta", badgeVariant: "primary" },
-];
-
-const toolsNav: NavItem[] = [
-  { label: "Integrity", href: "/integrity", icon: ShieldAlert, badge: "1", badgeVariant: "destructive" },
   { label: "Data Upload", href: "/data-upload", icon: Database },
-  { label: "Integrations", href: "/integrations", icon: Plug },
-  { label: "Audience", href: "/audience", icon: Users },
-  { label: "Templates", href: "/templates", icon: Layers },
+  { label: "OCR Upload", href: "/ocr-upload", icon: FileImage },
 ];
 
 const accountNav = [
@@ -71,14 +62,12 @@ interface SidebarProps {
     email?: string | null;
     image?: string | null;
   };
-  integrityAlerts?: number;
 }
 
 export function Sidebar({
   responsesThisMonth = 0,
   responsesLimit = 100,
   user,
-  integrityAlerts = 0,
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -108,26 +97,28 @@ export function Sidebar({
 
   const navItemClass = (href: string) =>
     cn(
-      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors group",
+      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all group relative",
       isActive(href)
-        ? "bg-primary/15 text-primary font-medium"
-        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+        ? "bg-primary/10 text-primary font-medium border-l-2 border-primary pl-[10px]"
+        : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-l-2 border-transparent pl-[10px]"
     );
 
   const navIconClass = (href: string) =>
     cn(
-      "h-4 w-4 shrink-0 transition-colors",
-      isActive(href) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+      "h-4 w-4 shrink-0 transition-all",
+      isActive(href)
+        ? "text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.7)]"
+        : "text-muted-foreground group-hover:text-foreground"
     );
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col bg-[hsl(240,10%,5%)] border-r border-border/40 z-50">
       {/* ── Logo ── */}
       <div className="flex items-center gap-2.5 px-4 py-4 border-b border-border/40">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shadow-[0_0_14px_rgba(108,99,255,0.5)]">
           <Sparkles className="h-4 w-4 text-primary-foreground" />
         </div>
-        <span className="text-lg font-bold tracking-tight">FeedMind</span>
+        <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">FeedMind</span>
       </div>
 
       {/* ── Workspace selector ── */}
@@ -174,39 +165,6 @@ export function Sidebar({
                 )}
               </Link>
             ))}
-          </div>
-        </div>
-
-        {/* TOOLS */}
-        <div>
-          <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 select-none">
-            Tools
-          </p>
-          <div className="space-y-0.5">
-            {toolsNav.map((item) => {
-              const badgeCount =
-                item.label === "Integrity" && integrityAlerts > 0
-                  ? integrityAlerts
-                  : item.badge;
-              return (
-                <Link key={item.href} href={item.href} className={navItemClass(item.href)}>
-                  <item.icon className={navIconClass(item.href)} />
-                  <span className="flex-1">{item.label}</span>
-                  {badgeCount && (
-                    <Badge
-                      className={cn(
-                        "ml-auto text-[10px] px-1.5 py-0 h-4 border-0 font-medium",
-                        item.badgeVariant === "destructive"
-                          ? "bg-red-500/20 text-red-400"
-                          : "bg-primary/20 text-primary"
-                      )}
-                    >
-                      {badgeCount}
-                    </Badge>
-                  )}
-                </Link>
-              );
-            })}
           </div>
         </div>
 

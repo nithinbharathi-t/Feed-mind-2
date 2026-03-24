@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProfileClient } from "./client";
+import { decodeUserSecrets } from "@/lib/user-secrets";
 
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
@@ -21,6 +22,8 @@ export default async function ProfilePage() {
   });
   if (!user) redirect("/auth");
 
+  const secrets = decodeUserSecrets(user.customApiKey);
+
   return (
     <div className="space-y-6">
       <PageHeader heading="Profile" description="Manage your account and API settings" />
@@ -29,7 +32,10 @@ export default async function ProfilePage() {
           name: user.name || "",
           email: user.email,
           image: user.image || "",
-          hasApiKey: !!user.customApiKey,
+          hasApiKey: !!secrets.groqApiKey,
+          hasSlackWebhook: !!secrets.slackWebhookUrl,
+          aiProvider: user.aiProvider || "gemini",
+          aiProviderEnabled: user.aiProviderEnabled ?? true,
           firstName: enrichedSessionUser.firstName || "",
           lastName: enrichedSessionUser.lastName || "",
           locale: enrichedSessionUser.locale || "",

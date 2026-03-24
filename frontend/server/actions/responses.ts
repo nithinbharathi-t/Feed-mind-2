@@ -46,6 +46,8 @@ export async function submitResponse(formId: string, data: {
 
   revalidatePath(`/forms/${formId}/responses`);
   revalidatePath(`/forms/${formId}/analytics`);
+  revalidatePath("/responses");
+  revalidatePath("/analytics");
   return response;
 }
 
@@ -88,6 +90,8 @@ export async function markResponseAsSpam(responseId: string) {
   });
 
   revalidatePath(`/forms/${response.formId}/responses`);
+  revalidatePath("/responses");
+  revalidatePath("/analytics");
   return updated;
 }
 
@@ -104,6 +108,8 @@ export async function flagResponse(responseId: string, flagged: boolean) {
   });
 
   revalidatePath(`/forms/${response.formId}/responses`);
+  revalidatePath("/responses");
+  revalidatePath("/analytics");
   return updated;
 }
 
@@ -116,4 +122,6 @@ export async function deleteResponse(responseId: string) {
 
   await prisma.response.delete({ where: { id: responseId } });
   revalidatePath(`/forms/${response.formId}/responses`);
+  revalidatePath("/responses");
+  revalidatePath("/analytics");
 }
